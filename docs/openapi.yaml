@@ -1,0 +1,320 @@
+openapi: 3.0.3
+info:
+  title: Sekiya Condominium Owner App API (Mock Draft)
+  version: 0.1.0
+servers:
+  - url: http://localhost:8081
+    description: Local mock API
+tags:
+  - name: returns
+  - name: admin
+  - name: announcements
+  - name: events
+  - name: chat
+  - name: me
+paths:
+  /returns/summary:
+    get:
+      tags: [returns]
+      summary: Get current month summary for the authenticated owner
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  period: { type: string, example: '2025-11' }
+                  occupancy_pct: { type: number, format: float, example: 0.78 }
+                  payout_per_room: { type: integer, nullable: true }
+                  your_payout: { type: integer, example: 30000 }
+                  finalized: { type: boolean }
+                  rooms:
+                    type: array
+                    items: { type: string }
+  /returns/series:
+    get:
+      tags: [returns]
+      summary: Get last 12 months series for chart
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    period: { type: string }
+                    occupancy_pct: { type: number }
+                    your_payout: { type: integer }
+                    finalized: { type: boolean }
+  /admin/returns/import-csv:
+    post:
+      tags: [admin]
+      summary: Import monthly returns CSV (room_code, occupancy_pct, payout_yen)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                period: { type: string, example: '2025-11' }
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Import accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  period: { type: string }
+                  rows: { type: integer }
+                  occupancy_pct: { type: number }
+                  rooms:
+                    type: array
+                    items: { type: string }
+  /admin/returns/preview:
+    get:
+      tags: [admin]
+      summary: Preview totals and owner breakdown
+      responses:
+        '200':
+          description: Preview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  period: { type: string }
+                  occupancy_pct: { type: number }
+                  total: { type: integer }
+                  breakdown:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        owner_id: { type: string }
+                        owner_name: { type: string }
+                        amount: { type: integer }
+                        rooms:
+                          type: array
+                          items: { type: string }
+  /admin/returns/finalize:
+    post:
+      tags: [admin]
+      summary: Finalize and apply to owner summaries
+      responses:
+        '200':
+          description: Finalized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  period: { type: string }
+                  finalized: { type: boolean }
+                  applied_at: { type: string, format: date-time }
+  /announcements:
+    get:
+      tags: [announcements]
+      summary: List announcements
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        title: { type: string }
+                        publish_at: { type: string, format: date-time }
+                        is_read: { type: boolean }
+                        excerpt: { type: string }
+                  next_cursor: { type: string, nullable: true }
+  /announcements/{id}:
+    get:
+      tags: [announcements]
+      summary: Get announcement detail
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  title: { type: string }
+                  publish_at: { type: string }
+                  is_read: { type: boolean }
+                  excerpt: { type: string }
+                  body: { type: string, description: HTML body }
+  /announcements/{id}/read:
+    post:
+      tags: [announcements]
+      summary: Mark as read
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /events:
+    get:
+      tags: [events]
+      summary: List events
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string }
+                    title: { type: string }
+                    starts_at: { type: string, format: date-time }
+                    ends_at: { type: string, format: date-time }
+                    location: { type: string }
+                    category: { type: string }
+                    capacity: { type: integer }
+                    going_count: { type: integer }
+                    waitlist_enabled: { type: boolean }
+                    my_status: { type: string, enum: [none, going, waitlist, cancelled] }
+  /events/{id}:
+    get:
+      tags: [events]
+      summary: Get event detail
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /events/{id}/rsvp:
+    get:
+      tags: [events]
+      summary: Get RSVP info
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [events]
+      summary: RSVP or cancel
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  enum: [join, cancel]
+      responses:
+        '200': { description: OK }
+  /events/{id}/eligible-participants:
+    get:
+      tags: [events]
+      summary: Eligible participants for RSVP
+      responses:
+        '200': { description: OK }
+  /chat/threads/me:
+    get:
+      tags: [chat]
+      summary: Get my thread summary
+      responses:
+        '200': { description: OK }
+  /chat/threads/{id}/messages:
+    get:
+      tags: [chat]
+      summary: List messages
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /chat/threads/{id}/read:
+    post:
+      tags: [chat]
+      summary: Mark manager messages read
+      responses:
+        '200': { description: OK }
+  /chat/threads/{id}/messages:
+    post:
+      tags: [chat]
+      summary: Post a message
+      responses:
+        '200': { description: OK }
+  /me/profile:
+    get:
+      tags: [me]
+      summary: Get profile
+      responses:
+        '200': { description: OK }
+    put:
+      tags: [me]
+      summary: Update profile
+      responses:
+        '200': { description: OK }
+  /me/family:
+    get:
+      tags: [me]
+      summary: List family
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [me]
+      summary: Add family member
+      responses:
+        '200': { description: OK }
+  /me/family/{id}:
+    patch:
+      tags: [me]
+      summary: Update family member
+      responses:
+        '200': { description: OK }
+    delete:
+      tags: [me]
+      summary: Delete family member
+      responses:
+        '200': { description: OK }
+  /me/units:
+    get:
+      tags: [me]
+      summary: List owned units
+      responses:
+        '200': { description: OK }
+
